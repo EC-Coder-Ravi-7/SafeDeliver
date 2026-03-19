@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeDeliver — Fraud Detection Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00e5ff;
+    --accent2: #ff3b6b;
+    --warn: #ffb800;
+    --green: #00e096;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 0;
+    background: rgba(10,14,26,0.95);
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-head); font-size: 22px; font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), #0055ff);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo span { color: var(--accent); }
+  .status-bar {
+    display: flex; align-items: center; gap: 20px; font-size: 11px; color: var(--muted);
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  .status-bar .live { color: var(--green); display:flex; align-items:center; gap:6px; }
+
+  /* STAT CARDS */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    padding: 28px 0 20px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative; overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .stat-card.blue::before { background: var(--accent); }
+  .stat-card.red::before { background: var(--accent2); }
+  .stat-card.warn::before { background: var(--warn); }
+  .stat-card.green::before { background: var(--green); }
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+  .stat-value { font-family: var(--font-head); font-size: 36px; font-weight: 800; line-height: 1; }
+  .stat-value.blue { color: var(--accent); }
+  .stat-value.red { color: var(--accent2); }
+  .stat-value.warn { color: var(--warn); }
+  .stat-value.green { color: var(--green); }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(20px); }
+    to { opacity:1; transform: translateY(0); }
+  }
+
+  /* MAIN GRID */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    padding-bottom: 40px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title {
+    font-family: var(--font-head); font-size: 13px; font-weight: 700;
+    letter-spacing: 0.5px; text-transform: uppercase; color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title .dot { width:8px;height:8px;border-radius:50%; }
+  .panel-title .dot.blue{background:var(--accent);}
+  .panel-title .dot.red{background:var(--accent2);}
+  .panel-tag {
+    font-size: 10px; padding: 3px 10px; border-radius: 20px;
+    background: rgba(0,229,255,0.1); color: var(--accent);
+    border: 1px solid rgba(0,229,255,0.2);
+  }
+
+  /* MAP */
+  .map-area {
+    position: relative;
+    height: 420px;
+    background: #0d1520;
+    overflow: hidden;
+  }
+  .map-svg { width:100%;height:100%; }
+
+  /* PARTNERS TABLE */
+  .partners-list { padding: 0; }
+  .partner-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 90px 110px 100px;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+    cursor: pointer;
+    animation: fadeUp 0.4s ease both;
+  }
+  .partner-row:hover { background: var(--surface2); }
+  .partner-row:last-child { border-bottom: none; }
+  .partner-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .partner-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .partner-loc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .partner-status {
+    font-size: 10px; padding: 4px 10px; border-radius: 20px;
+    text-align: center; font-weight: 700; letter-spacing: 0.5px;
+  }
+  .s-green { background: rgba(0,224,150,0.12); color: var(--green); border:1px solid rgba(0,224,150,0.3); }
+  .s-red { background: rgba(255,59,107,0.12); color: var(--accent2); border:1px solid rgba(255,59,107,0.3); }
+  .s-warn { background: rgba(255,184,0,0.12); color: var(--warn); border:1px solid rgba(255,184,0,0.3); }
+  .s-blue { background: rgba(0,229,255,0.12); color: var(--accent); border:1px solid rgba(0,229,255,0.3); }
+
+  /* FRS BAR */
+  .frs-wrap { display:flex; align-items:center; gap:8px; }
+  .frs-bar-bg {
+    flex:1; height:6px; background: var(--border); border-radius:3px; overflow:hidden;
+  }
+  .frs-bar-fill { height:100%; border-radius:3px; transition: width 1s ease; }
+  .frs-num { font-size:11px; font-weight:700; min-width:26px; text-align:right; }
+
+  /* SIDEBAR */
+  .sidebar { display:flex; flex-direction:column; gap:20px; }
+
+  /* ALERT PANEL */
+  .alert-item {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; gap: 12px; align-items: flex-start;
+    animation: fadeUp 0.5s ease both;
+  }
+  .alert-item:last-child { border-bottom:none; }
+  .alert-icon {
+    width:32px;height:32px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;flex-shrink:0;
+  }
+  .ai-red { background:rgba(255,59,107,0.15); }
+  .ai-warn { background:rgba(255,184,0,0.15); }
+  .ai-blue { background:rgba(0,229,255,0.15); }
+  .ai-green { background:rgba(0,224,150,0.15); }
+  .alert-body {}
+  .alert-title { font-size:12px; font-weight:700; margin-bottom:3px; }
+  .alert-desc { font-size:11px; color:var(--muted); line-height:1.5; }
+  .alert-time { font-size:10px; color:var(--muted); margin-top:4px; }
+
+  /* FRS GAUGE */
+  .gauge-wrap {
+    display:flex;flex-direction:column;align-items:center;
+    padding: 24px 20px 20px;
+  }
+  .gauge-title { font-size:11px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:20px; }
+  .gauge-svg { width:180px;height:100px; }
+  .gauge-score {
+    font-family:var(--font-head); font-size:48px; font-weight:800;
+    color: var(--accent2); margin-top:12px; line-height:1;
+  }
+  .gauge-label { font-size:12px; color:var(--muted); margin-top:6px; }
+  .gauge-signals {
+    width:100%;margin-top:20px;display:flex;flex-direction:column;gap:8px;
+  }
+  .signal-row {
+    display:flex;align-items:center;justify-content:space-between;
+    font-size:11px;
+  }
+  .signal-name { color:var(--muted); }
+  .signal-val { font-weight:700; }
+  .signal-val.danger { color:var(--accent2); }
+  .signal-val.ok { color:var(--green); }
+  .signal-val.warn { color:var(--warn); }
+
+  /* TICKER */
+  .ticker-wrap {
+    overflow:hidden;height:40px;border-top:1px solid var(--border);
+    background:rgba(0,229,255,0.03);
+    display:flex;align-items:center;
+  }
+  .ticker-inner {
+    display:flex;gap:48px;
+    animation: ticker 18s linear infinite;
+    white-space:nowrap;font-size:11px;color:var(--muted);padding: 0 24px;
+  }
+  .ticker-inner span { color:var(--accent); margin-right:6px; }
+  @keyframes ticker {
+    from{transform:translateX(0);}
+    to{transform:translateX(-50%);}
+  }
+
+  /* HEADER TABLE LABELS */
+  .table-header {
+    display:grid;
+    grid-template-columns: 32px 1fr 90px 110px 100px;
+    gap:12px;padding:10px 20px;
+    font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;
+    border-bottom:1px solid var(--border);
+    background:rgba(0,0,0,0.2);
+  }
+
+  .section-gap { margin-top: 4px; }
+
+  /* Animated blip on map */
+  .blip {
+    animation: blip 2s ease-in-out infinite;
+  }
+  @keyframes blip {
+    0%,100%{opacity:1;r:6;}
+    50%{opacity:0.5;r:10;}
+  }
+  .blip-ring {
+    animation: blip-ring 2s ease-out infinite;
+  }
+  @keyframes blip-ring {
+    0%{opacity:0.8;r:8;}
+    100%{opacity:0;r:24;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">🚚</div>
+        Safe<span>Deliver</span>
+      </div>
+      <div class="status-bar">
+        <div class="live"><div class="live-dot"></div> LIVE MONITORING</div>
+        <div>Mumbai Metro Zone · Phase 1</div>
+        <div id="clock">--:--:--</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Ticker -->
+<div class="ticker-wrap">
+  <div class="ticker-inner">
+    <span>⚠️</span> FRAUD RING DETECTED · Zone 4B · 12 partners flagged &nbsp;&nbsp;
+    <span>✅</span> Partner #1042 verified genuine · auto-approved &nbsp;&nbsp;
+    <span>🔴</span> GPS spoof attempt blocked · FRS 94 · escalated to human review &nbsp;&nbsp;
+    <span>📡</span> Weather API: No storm confirmed in claimed distress zone &nbsp;&nbsp;
+    <span>⚠️</span> FRAUD RING DETECTED · Zone 4B · 12 partners flagged &nbsp;&nbsp;
+    <span>✅</span> Partner #1042 verified genuine · auto-approved &nbsp;&nbsp;
+    <span>🔴</span> GPS spoof attempt blocked · FRS 94 · escalated to human review &nbsp;&nbsp;
+    <span>📡</span> Weather API: No storm confirmed in claimed distress zone &nbsp;&nbsp;
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- STAT CARDS -->
+  <div class="stats-row">
+    <div class="stat-card blue" style="animation-delay:0.05s">
+      <div class="stat-label">Active Partners</div>
+      <div class="stat-value blue" id="cnt-active">487</div>
+      <div class="stat-sub">↑ 23 joined last hour</div>
+    </div>
+    <div class="stat-card red" style="animation-delay:0.1s">
+      <div class="stat-label">Fraud Flags Today</div>
+      <div class="stat-value red" id="cnt-fraud">34</div>
+      <div class="stat-sub">↑ 12 in last 30 min</div>
+    </div>
+    <div class="stat-card warn" style="animation-delay:0.15s">
+      <div class="stat-label">Under Review</div>
+      <div class="stat-value warn" id="cnt-review">9</div>
+      <div class="stat-sub">Avg review time: 11 min</div>
+    </div>
+    <div class="stat-card green" style="animation-delay:0.2s">
+      <div class="stat-label">Auto-Approved</div>
+      <div class="stat-value green" id="cnt-approved">218</div>
+      <div class="stat-sub">₹4.2L paid out today</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- LEFT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- MAP -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot blue"></div> Live Partner Map · Mumbai</div>
+          <div class="panel-tag">REAL-TIME</div>
+        </div>
+        <div class="map-area">
+          <svg class="map-svg" viewBox="0 0 700 420" xmlns="http://www.w3.org/2000/svg">
+            <!-- Road grid -->
+            <line x1="0" y1="140" x2="700" y2="140" stroke="#1a2d45" stroke-width="1.5"/>
+            <line x1="0" y1="260" x2="700" y2="260" stroke="#1a2d45" stroke-width="1.5"/>
+            <line x1="0" y1="340" x2="700" y2="340" stroke="#1a2d45" stroke-width="1.5"/>
+            <line x1="140" y1="0" x2="140" y2="420" stroke="#1a2d45" stroke-width="1.5"/>
+            <line x1="280" y1="0" x2="280" y2="420" stroke="#1a2d45" stroke-width="1.5"/>
+            <line x1="420" y1="0" x2="420" y2="420" stroke="#1a2d45" stroke-width="1.5"/>
+            <line x1="560" y1="0" x2="560" y2="420" stroke="#1a2d45" stroke-width="1.5"/>
+            <!-- Zone label -->
+            <text x="12" y="20" fill="#1e3a5a" font-size="11" font-family="Space Mono">ZONE 4B — HIGH RISK</text>
+            <rect x="0" y="0" width="280" height="260" fill="rgba(255,59,107,0.04)" rx="0"/>
+            <text x="100" y="240" fill="rgba(255,59,107,0.25)" font-size="10" font-family="Space Mono">FRAUD CLUSTER</text>
+
+            <!-- Genuine partner - green -->
+            <circle cx="400" cy="300" r="20" fill="rgba(0,224,150,0.08)" stroke="rgba(0,224,150,0.3)" stroke-width="1"/>
+            <circle cx="400" cy="300" r="7" fill="#00e096" class="blip"/>
+            <circle cx="400" cy="300" r="8" fill="none" stroke="#00e096" stroke-width="1" class="blip-ring"/>
+            <text x="412" y="296" fill="#00e096" font-size="10" font-family="Space Mono">✓ Ravi K.</text>
+            <text x="412" y="308" fill="#64748b" font-size="9" font-family="Space Mono">FRS: 12</text>
+
+            <!-- Genuine partner 2 -->
+            <circle cx="580" cy="180" r="7" fill="#00e096"/>
+            <text x="592" y="176" fill="#00e096" font-size="10" font-family="Space Mono">✓ Meena S.</text>
+            <text x="592" y="188" fill="#64748b" font-size="9" font-family="Space Mono">FRS: 8</text>
+
+            <!-- Genuine partner 3 -->
+            <circle cx="490" cy="360" r="7" fill="#00e096"/>
+            <text x="502" y="356" fill="#00e096" font-size="10" font-family="Space Mono">✓ Arjun T.</text>
+            <text x="502" y="368" fill="#64748b" font-size="9" font-family="Space Mono">FRS: 21</text>
+
+            <!-- WARNING partner -->
+            <circle cx="300" cy="320" r="20" fill="rgba(255,184,0,0.08)" stroke="rgba(255,184,0,0.3)" stroke-width="1"/>
+            <circle cx="300" cy="320" r="7" fill="#ffb800"/>
+            <text x="312" y="316" fill="#ffb800" font-size="10" font-family="Space Mono">⚠ Imran B.</text>
+            <text x="312" y="328" fill="#64748b" font-size="9" font-family="Space Mono">FRS: 58</text>
+
+            <!-- FRAUD partners - red cluster in Zone 4B -->
+            <circle cx="80" cy="80" r="30" fill="rgba(255,59,107,0.06)" stroke="rgba(255,59,107,0.4)" stroke-width="1" stroke-dasharray="4 2"/>
+            <text x="48" y="44" fill="rgba(255,59,107,0.6)" font-size="9" font-family="Space Mono">FRAUD RING</text>
+
+            <circle cx="60" cy="70" r="7" fill="#ff3b6b" class="blip" style="animation-delay:0.3s"/>
+            <circle cx="60" cy="70" r="8" fill="none" stroke="#ff3b6b" stroke-width="1" class="blip-ring" style="animation-delay:0.3s"/>
+            <text x="72" y="66" fill="#ff3b6b" font-size="10" font-family="Space Mono">✗ Fake #1</text>
+            <text x="72" y="78" fill="#64748b" font-size="9" font-family="Space Mono">FRS: 94</text>
+
+            <circle cx="100" cy="100" r="7" fill="#ff3b6b" class="blip" style="animation-delay:0.6s"/>
+            <circle cx="100" cy="100" r="8" fill="none" stroke="#ff3b6b" stroke-width="1" class="blip-ring" style="animation-delay:0.6s"/>
+            <text x="112" y="96" fill="#ff3b6b" font-size="10" font-family="Space Mono">✗ Fake #2</text>
+            <text x="112" y="108" fill="#64748b" font-size="9" font-family="Space Mono">FRS: 88</text>
+
+            <circle cx="65" cy="120" r="7" fill="#ff3b6b" class="blip" style="animation-delay:0.9s"/>
+            <text x="77" y="116" fill="#ff3b6b" font-size="10" font-family="Space Mono">✗ Fake #3</text>
+            <text x="77" y="128" fill="#64748b" font-size="9" font-family="Space Mono">FRS: 91</text>
+
+            <!-- Legend -->
+            <rect x="550" y="370" width="140" height="44" rx="6" fill="rgba(10,14,26,0.8)" stroke="#1e2d45" stroke-width="1"/>
+            <circle cx="566" cy="382" r="5" fill="#00e096"/>
+            <text x="576" y="386" fill="#94a3b8" font-size="10" font-family="Space Mono">Genuine</text>
+            <circle cx="566" cy="400" r="5" fill="#ff3b6b"/>
+            <text x="576" y="404" fill="#94a3b8" font-size="10" font-family="Space Mono">Fraud Flag</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- PARTNERS TABLE -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot red"></div> Active Claims — Fraud Risk Scoring</div>
+          <div class="panel-tag">LIVE</div>
+        </div>
+        <div class="table-header">
+          <div></div>
+          <div>Partner</div>
+          <div>Status</div>
+          <div>Fraud Risk Score</div>
+          <div>Tier</div>
+        </div>
+        <div class="partners-list" id="partners-list">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <div class="sidebar">
+
+      <!-- GAUGE -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot red"></div> Active Fraud Case</div>
+        </div>
+        <div class="gauge-wrap">
+          <div class="gauge-title">Fraud Risk Score — Partner #F001</div>
+          <svg class="gauge-svg" viewBox="0 0 180 100">
+            <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="#1e2d45" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
+              stroke-dasharray="220" stroke-dashoffset="22" id="gauge-arc"/>
+            <defs>
+              <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00e096"/>
+                <stop offset="50%" stop-color="#ffb800"/>
+                <stop offset="100%" stop-color="#ff3b6b"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="gauge-score">94</div>
+          <div class="gauge-label">🔴 RED TIER — Fraud Escalated</div>
+          <div class="gauge-signals">
+            <div class="signal-row">
+              <span class="signal-name">GPS vs IP mismatch</span>
+              <span class="signal-val danger">FLAGGED</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Motion sensors</span>
+              <span class="signal-val danger">STATIC (home)</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Network type</span>
+              <span class="signal-val warn">Home Wi-Fi</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Weather API</span>
+              <span class="signal-val ok">No storm found</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Fraud ring link</span>
+              <span class="signal-val danger">+11 partners</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">NLP claim match</span>
+              <span class="signal-val danger">SCRIPTED TEXT</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot red"></div> System Alerts</div>
+        </div>
+        <div class="alert-item" style="animation-delay:0.1s">
+          <div class="alert-icon ai-red">🔴</div>
+          <div class="alert-body">
+            <div class="alert-title" style="color:var(--accent2)">Fraud Ring Detected</div>
+            <div class="alert-desc">12 partners claiming distress in Zone 4B simultaneously. GPS spoofing confirmed via IP cross-check.</div>
+            <div class="alert-time">2 min ago</div>
+          </div>
+        </div>
+        <div class="alert-item" style="animation-delay:0.2s">
+          <div class="alert-icon ai-warn">⚠️</div>
+          <div class="alert-body">
+            <div class="alert-title" style="color:var(--warn)">Soft Review Triggered</div>
+            <div class="alert-desc">Imran B. — FRS 58. First-time anomaly. Payout held. Photo upload requested.</div>
+            <div class="alert-time">8 min ago</div>
+          </div>
+        </div>
+        <div class="alert-item" style="animation-delay:0.3s">
+          <div class="alert-icon ai-green">✅</div>
+          <div class="alert-body">
+            <div class="alert-title" style="color:var(--green)">Auto-Approved</div>
+            <div class="alert-desc">Ravi K. — FRS 12. All signals normal. Storm confirmed by weather API. ₹1,200 paid instantly.</div>
+            <div class="alert-time">14 min ago</div>
+          </div>
+        </div>
+        <div class="alert-item" style="animation-delay:0.4s">
+          <div class="alert-icon ai-blue">🤖</div>
+          <div class="alert-body">
+            <div class="alert-title" style="color:var(--accent)">NLP Alert</div>
+            <div class="alert-desc">Claim narrations from 9 flagged partners are 94% identical. Coordinated scripting detected.</div>
+            <div class="alert-time">18 min ago</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-IN');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Partners data
+const partners = [
+  { name: 'Ravi Kumar', loc: 'Andheri East', frs: 12, tier: 'GREEN', status: 'Auto-Approved', color: 'green', initials: 'RK', bg: '#00e096' },
+  { name: 'Meena Sharma', loc: 'Bandra West', frs: 8, tier: 'GREEN', status: 'Auto-Approved', color: 'green', initials: 'MS', bg: '#00e096' },
+  { name: 'Imran Baig', loc: 'Dharavi', frs: 58, tier: 'YELLOW', status: 'Soft Review', color: 'warn', initials: 'IB', bg: '#ffb800' },
+  { name: 'Arjun Tiwari', loc: 'Kurla', frs: 21, tier: 'GREEN', status: 'Auto-Approved', color: 'green', initials: 'AT', bg: '#00e096' },
+  { name: 'Fake GPS #1', loc: 'Zone 4B', frs: 94, tier: 'RED', status: 'Fraud Flag', color: 'red', initials: 'F1', bg: '#ff3b6b' },
+  { name: 'Fake GPS #2', loc: 'Zone 4B', frs: 88, tier: 'RED', status: 'Fraud Flag', color: 'red', initials: 'F2', bg: '#ff3b6b' },
+  { name: 'Fake GPS #3', loc: 'Zone 4B', frs: 91, tier: 'RED', status: 'Fraud Flag', color: 'red', initials: 'F3', bg: '#ff3b6b' },
+];
+
+const colorMap = { green: '#00e096', red: '#ff3b6b', warn: '#ffb800', blue: '#00e5ff' };
+const statusClass = { green: 's-green', red: 's-red', warn: 's-warn', blue: 's-blue' };
+
+const list = document.getElementById('partners-list');
+partners.forEach((p, i) => {
+  const frsColor = p.frs < 35 ? '#00e096' : p.frs < 65 ? '#ffb800' : '#ff3b6b';
+  list.innerHTML += `
+    <div class="partner-row" style="animation-delay:${0.05 * i}s">
+      <div class="partner-avatar" style="background:${p.bg}22;color:${p.bg};border:1px solid ${p.bg}44;font-size:10px;">${p.initials}</div>
+      <div>
+        <div class="partner-name">${p.name}</div>
+        <div class="partner-loc">📍 ${p.loc}</div>
+      </div>
+      <div class="partner-status ${statusClass[p.color]}">${p.status}</div>
+      <div class="frs-wrap">
+        <div class="frs-bar-bg">
+          <div class="frs-bar-fill" style="width:${p.frs}%;background:${frsColor};"></div>
+        </div>
+        <div class="frs-num" style="color:${frsColor};">${p.frs}</div>
+      </div>
+      <div class="partner-status ${statusClass[p.color]}">${p.tier}</div>
+    </div>`;
+});
+
+// Animate stats counting up
+function countUp(id, target, duration=1500) {
+  const el = document.getElementById(id);
+  let start = 0;
+  const step = target / (duration / 16);
+  const timer = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = Math.floor(start);
+    if (start >= target) clearInterval(timer);
+  }, 16);
+}
+setTimeout(() => {
+  countUp('cnt-active', 487);
+  countUp('cnt-fraud', 34);
+  countUp('cnt-review', 9);
+  countUp('cnt-approved', 218);
+}, 300);
+</script>
+</body>
+</html>
